@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Light map</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="garland" aria-hidden="true">
+    <span></span><span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span><span></span>
+  </div>
+
+  <main class="page">
+    <header class="hero">
+      <h1>Where do your lights live?</h1>
+      <p>Place each light on a photo of your room, or on a grid, and we'll turn it into a map.</p>
+    </header>
+
+    <div class="choices">
+      <section class="card card-image">
+        <h2>Use a photo</h2>
+        <p class="card-text">Upload a picture of the space your lights hang in.</p>
+
+        <form id="image-form" method="post" action="/place/image" enctype="multipart/form-data">
+          <input type="file" id="image-input" name="image" accept="image/*" hidden>
+          <label for="image-input" class="drop" tabindex="0">
+            <img id="image-preview" alt="Preview of your photo" hidden>
+            <span id="image-name" class="drop-text">Choose an image</span>
+          </label>
+          <button type="submit" id="start-image" class="btn" disabled>Start placing on image</button>
+        </form>
+      </section>
+
+      <div class="or" aria-hidden="true">or</div>
+
+      <section class="card card-grid">
+        <h2>Describe a grid</h2>
+        <p class="card-text">No photo? Tell us how big the grid is.</p>
+
+        <form id="grid-form" method="get" action="/place/grid">
+          <div class="fields">
+            <label class="field">Width
+              <input type="number" id="grid-w" name="w" min="1" max="256" value="16" required>
+            </label>
+            <label class="field">Height
+              <input type="number" id="grid-h" name="h" min="1" max="256" value="8" required>
+            </label>
+            <label class="field">Cell size (px)
+              <input type="number" id="grid-cell" name="cell" min="4" max="200" value="32" required>
+            </label>
+          </div>
+          <button type="submit" class="btn">Start placing on grid</button>
+        </form>
+      </section>
+    </div>
+  </main>
+
+  <script src="{{ url_for('static', filename='landing.js') }}"></script>
+</body>
+</html>
