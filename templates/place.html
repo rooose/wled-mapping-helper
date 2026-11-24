@@ -46,6 +46,21 @@
       Click where the lit LED is. Click a dot to light that LED again, and drag a dot to move it.
       Left and right arrow keys switch LEDs. Everything saves automatically.
     </p>
+
+    <section class="export">
+      <h2>Export ledmap</h2>
+      <p class="muted">Pick how many columns and rows the map should have.</p>
+      <div class="export-row">
+        <label class="field narrow">Width
+          <input type="number" id="export-w" min="1" max="256" value="16">
+        </label>
+        <label class="field narrow">Height
+          <input type="number" id="export-h" min="1" max="256" value="8">
+        </label>
+        <button type="button" id="export" class="btn small">Export ledmap</button>
+      </div>
+      <p id="export-msg" class="export-msg" role="status"></p>
+    </section>
   </main>
 
   <script src="{{ url_for('static', filename='place.js') }}"></script>

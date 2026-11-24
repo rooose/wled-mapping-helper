@@ -21,13 +21,25 @@
       <p>Place each light on a photo of your room, or on a grid, and we'll turn it into a map.</p>
     </header>
 
+    <section class="card card-connect">
+      <h2>Connect to your lights</h2>
+      <p class="card-text">Enter your controller's IP so each LED can light up while you place it.</p>
+      <form id="connect-form" class="connect-row">
+        <label class="field">Controller IP
+          <input type="text" id="landing-ip" placeholder="192.168.1.45" autocomplete="off" required>
+        </label>
+        <button type="submit" class="btn">Connect</button>
+      </form>
+      <p id="connect-status" class="connect-status" role="status">Not connected</p>
+    </section>
+
     <div class="choices">
       <section class="card card-image">
         <h2>Use a photo</h2>
-        <p class="card-text">Upload a picture of the space your lights hang in.</p>
+        <p class="card-text">Upload a picture of the space your lights hang in. It stays in your browser.</p>
 
-        <form id="image-form" method="post" action="/place/image" enctype="multipart/form-data">
-          <input type="file" id="image-input" name="image" accept="image/*" hidden>
+        <form id="image-form">
+          <input type="file" id="image-input" accept="image/*" hidden>
           <label for="image-input" class="drop" tabindex="0">
             <img id="image-preview" alt="Preview of your photo" hidden>
             <span id="image-name" class="drop-text">Choose an image</span>

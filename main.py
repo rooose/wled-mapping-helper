@@ -1,18 +1,16 @@
 import json
 import re
-import time
 from pathlib import Path
 
 import requests
-from flask import (Flask, jsonify, redirect, render_template, request,
-                   send_from_directory, url_for)
+from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 app = Flask(__name__)
 
+# only positions.json lives here now; photos stay in the browser
 DATA = Path(__file__).parent / "data"
 DATA.mkdir(exist_ok=True)
 
-ALLOWED = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 HOST_RE = re.compile(r"[A-Za-z0-9._-]+(:\d+)?")
 
 
@@ -21,19 +19,6 @@ HOST_RE = re.compile(r"[A-Za-z0-9._-]+(:\d+)?")
 @app.route("/")
 def index():
     return render_template("index.html")
-
-
-@app.route("/place/image", methods=["POST"])
-def place_image():
-    file = request.files.get("image")
-    if not file or not file.filename:
-        return redirect(url_for("index"))
-    ext = Path(file.filename).suffix.lower()
-    if ext not in ALLOWED:
-        return "Unsupported image type", 400
-    name = f"background-{int(time.time())}{ext}"
-    file.save(DATA / name)
-    return redirect(url_for("place", mode="image", img=name))
 
 
 @app.route("/place/grid")
@@ -49,11 +34,6 @@ def place_grid():
 @app.route("/place")
 def place():
     return render_template("place.html")
-
-
-@app.route("/data/<path:filename>")
-def data_file(filename):
-    return send_from_directory(DATA, filename)
 
 
 # ---------- saved positions ----------

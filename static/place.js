@@ -9,6 +9,9 @@ const connectBtn = document.getElementById('connect');
 const statusEl = document.getElementById('status');
 const currentEl = document.getElementById('current');
 const progressEl = document.getElementById('progress');
+const exportW = document.getElementById('export-w');
+const exportH = document.getElementById('export-h');
+const exportMsg = document.getElementById('export-msg');
 
 const PLUM = '#3b1f4a';
 const PINK = '#ff8cc6';
@@ -16,7 +19,7 @@ const BUTTER = '#fff0a6';
 
 const state = {
   ip: localStorage.getItem('wledIp') || '',
-  count: 50,
+  count: parseInt(localStorage.getItem('wledCount'), 10) || 50,
   leds: [],          // each entry: null or {x, y} as fractions (0 to 1)
   current: 0,
   key: '',
@@ -24,6 +27,8 @@ const state = {
   bg: null,
   dragging: null,
 };
+
+countInput.value = state.count;
 
 // ---------- helpers ----------
 
@@ -152,6 +157,7 @@ async function connect() {
       return;
     }
     localStorage.setItem('wledIp', state.ip);
+    localStorage.setItem('wledCount', String(out.count));
     state.count = out.count;
     countInput.value = out.count;
     resizeLeds();
@@ -279,6 +285,94 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowRight') select(state.current + 1);
 });
 
+// ---------- export ----------
+
+function setExportDefaults() {
+  if (state.grid) {
+    exportW.value = state.grid.w;
+    exportH.value = state.grid.h;
+  } else {
+    exportW.value = 16;
+    exportH.value = Math.max(1, Math.round((16 * canvas.height) / canvas.width));
+  }
+}
+
+function buildLedmap(w, h) {
+  const map = new Array(w * h).fill(-1);
+  const collisions = [];
+  const missing = [];
+
+  state.leds.forEach((p, i) => {
+    if (!p) {
+      missing.push(i);
+      return;
+    }
+    const cx = clamp(Math.floor(p.x * w), 0, w - 1);
+    const cy = clamp(Math.floor(p.y * h), 0, h - 1);
+    const cell = cy * w + cx;
+    if (map[cell] !== -1) {
+      collisions.push({ led: i, other: map[cell] });
+    } else {
+      map[cell] = i;
+    }
+  });
+
+  return { map: map, collisions: collisions, missing: missing };
+}
+
+function listShort(items) {
+  return items.length > 8 ? items.slice(0, 8).join(', ') + '...' : items.join(', ');
+}
+
+function setExportMsg(text, kind) {
+  exportMsg.textContent = text;
+  exportMsg.className = 'export-msg' + (kind ? ' ' + kind : '');
+}
+
+document.getElementById('export').addEventListener('click', () => {
+  const w = clamp(parseInt(exportW.value, 10) || 1, 1, 256);
+  const h = clamp(parseInt(exportH.value, 10) || 1, 1, 256);
+  exportW.value = w;
+  exportH.value = h;
+
+  const result = buildLedmap(w, h);
+  const problems = [];
+  if (result.missing.length) {
+    problems.push(
+      result.missing.length + ' LEDs are not placed yet (' + listShort(result.missing) + ').'
+    );
+  }
+  if (result.collisions.length) {
+    problems.push(
+      result.collisions.length + ' LEDs share a cell with another one and would be left out (' +
+      listShort(result.collisions.map((c) => c.led + ' with ' + c.other)) +
+      '). A bigger width and height will fix this.'
+    );
+  }
+
+  if (problems.length && !confirm(problems.join('\n\n') + '\n\nDownload anyway?')) {
+    setExportMsg(problems.join(' '), 'warn');
+    return;
+  }
+
+  const json = JSON.stringify({ map: result.map, width: w, height: h });
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ledmap1.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+
+  const mapped = state.count - result.missing.length - result.collisions.length;
+  setExportMsg(
+    'Exported ledmap1.json (' + w + ' x ' + h + ', ' + mapped + ' LEDs mapped)',
+    problems.length ? 'warn' : 'ok'
+  );
+});
+
 // ---------- saving ----------
 
 let saveTimer = null;
@@ -316,7 +410,11 @@ async function loadSaved() {
   ipInput.value = state.ip;
   resizeLeds();
   state.current = firstUnplaced();
+  setExportDefaults();
   draw();
+
+  // connect right away if we already know the controller
+  if (state.ip) connect();
 }
 
 function init() {
@@ -330,12 +428,14 @@ function init() {
     canvas.height = h * cell;
     loadSaved();
   } else {
-    const img = params.get('img');
-    if (!img) {
+    // the photo lives in this browser tab only (put there by the landing page)
+    const dataUrl = sessionStorage.getItem('bgImage');
+    const bgKey = sessionStorage.getItem('bgKey');
+    if (!dataUrl) {
       location.href = '/';
       return;
     }
-    state.key = 'image:' + img;
+    state.key = 'image:' + bgKey;
     const bg = new Image();
     bg.onload = () => {
       state.bg = bg;
@@ -344,7 +444,7 @@ function init() {
       loadSaved();
     };
     bg.onerror = () => setStatus('Could not load the image', 'error');
-    bg.src = '/data/' + encodeURIComponent(img);
+    bg.src = dataUrl;
   }
 }
 

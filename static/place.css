@@ -18,17 +18,7 @@
 .field.narrow { flex: 0 0 auto; }
 .field.narrow input { width: 90px; }
 
-input[type="text"] {
-  width: 190px;
-  padding: 10px 12px;
-  font: inherit;
-  font-weight: 600;
-  color: var(--plum);
-  background: #fff;
-  border: 3px solid var(--plum);
-  border-radius: 12px;
-}
-
+.bar input[type="text"] { width: 190px; }
 .bar input[type="number"] { width: 90px; }
 
 .btn.small {
@@ -43,6 +33,7 @@ input[type="text"] {
 
 #connect { background: var(--pink); }
 #clear { background: var(--butter); }
+#export { background: var(--mint); }
 
 .status {
   align-self: center;
@@ -59,7 +50,7 @@ input[type="text"] {
   flex-direction: column;
   align-items: center;
   gap: 14px;
-  padding: 24px 16px 32px;
+  padding: 24px 16px 40px;
 }
 
 .now { text-align: center; }
@@ -87,3 +78,33 @@ canvas {
 }
 
 .hint { max-width: 46em; text-align: center; font-size: 0.95rem; }
+
+/* export */
+.export {
+  width: min(100%, 520px);
+  margin-top: 12px;
+  padding: 20px;
+  background: var(--lilac-soft);
+  border: 3px solid var(--plum);
+  border-radius: 18px;
+  box-shadow: 5px 5px 0 var(--plum);
+}
+
+.export h2 { font-size: 1.3rem; margin-bottom: 4px; }
+
+.export-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.export-msg {
+  margin: 12px 0 0;
+  font-weight: 800;
+  min-height: 1.4em;
+}
+
+.export-msg.ok { color: #1c7a5a; }
+.export-msg.warn { color: #9a5b00; }
