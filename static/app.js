@@ -1,14 +1,21 @@
-const params = new URLSearchParams(location.search);
-const mode = params.get('mode') === 'grid' ? 'grid' : 'image';
-
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
+
 const ipInput = document.getElementById('ip');
 const countInput = document.getElementById('count');
-const connectBtn = document.getElementById('connect');
+const connectForm = document.getElementById('connect-form');
 const statusEl = document.getElementById('status');
+
+const picInput = document.getElementById('pic');
+const picBtn = document.getElementById('pic-btn');
+const removePicBtn = document.getElementById('remove-pic');
+const snapBox = document.getElementById('snap');
+const colsInput = document.getElementById('cols');
+const rowsInput = document.getElementById('rows');
+
 const currentEl = document.getElementById('current');
 const progressEl = document.getElementById('progress');
+
 const exportW = document.getElementById('export-w');
 const exportH = document.getElementById('export-h');
 const exportMsg = document.getElementById('export-msg');
@@ -16,19 +23,17 @@ const exportMsg = document.getElementById('export-msg');
 const PLUM = '#3b1f4a';
 const PINK = '#ff8cc6';
 const BUTTER = '#fff0a6';
+const BLANK_W = 960;
+const BLANK_H = 540;
 
 const state = {
   ip: localStorage.getItem('wledIp') || '',
   count: parseInt(localStorage.getItem('wledCount'), 10) || 50,
   leds: [],          // each entry: null or {x, y} as fractions (0 to 1)
   current: 0,
-  key: '',
-  grid: null,        // {w, h, cell} in grid mode
-  bg: null,
+  bg: null,          // an Image, or null when there's no picture
   dragging: null,
 };
-
-countInput.value = state.count;
 
 // ---------- helpers ----------
 
@@ -36,9 +41,18 @@ function clamp(n, lo, hi) {
   return Math.min(hi, Math.max(lo, n));
 }
 
+function intValue(input, fallback, lo, hi) {
+  return clamp(parseInt(input.value, 10) || fallback, lo, hi);
+}
+
 function setStatus(text, kind) {
   statusEl.textContent = text;
   statusEl.className = 'status' + (kind ? ' ' + kind : '');
+}
+
+function setExportMsg(text, kind) {
+  exportMsg.textContent = text;
+  exportMsg.className = 'status' + (kind ? ' ' + kind : '');
 }
 
 async function post(url, body) {
@@ -48,6 +62,13 @@ async function post(url, body) {
     body: JSON.stringify(body),
   });
   return res.json();
+}
+
+function gridSize() {
+  return {
+    cols: intValue(colsInput, 16, 1, 256),
+    rows: intValue(rowsInput, 9, 1, 256),
+  };
 }
 
 function resizeLeds() {
@@ -83,21 +104,32 @@ function draw() {
   const H = canvas.height;
   ctx.clearRect(0, 0, W, H);
 
-  if (mode === 'image' && state.bg) {
+  if (state.bg) {
     ctx.drawImage(state.bg, 0, 0, W, H);
-  } else if (state.grid) {
+  } else {
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, W, H);
-    ctx.strokeStyle = '#e6d7ee';
-    ctx.lineWidth = 1;
+    ctx.fillStyle = '#c9b8d3';
+    ctx.font = '600 ' + Math.round(H / 22) + 'px Nunito, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Upload a picture of your room (optional)', W / 2, H / 2);
+  }
+
+  if (snapBox.checked) {
+    const g = gridSize();
+    ctx.strokeStyle = 'rgba(59, 31, 74, 0.35)';
+    ctx.lineWidth = Math.max(1, W / 700);
     ctx.beginPath();
-    for (let x = 0; x <= state.grid.w; x++) {
-      ctx.moveTo(x * state.grid.cell + 0.5, 0);
-      ctx.lineTo(x * state.grid.cell + 0.5, H);
+    for (let c = 0; c <= g.cols; c++) {
+      const x = (c / g.cols) * W;
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, H);
     }
-    for (let y = 0; y <= state.grid.h; y++) {
-      ctx.moveTo(0, y * state.grid.cell + 0.5);
-      ctx.lineTo(W, y * state.grid.cell + 0.5);
+    for (let r = 0; r <= g.rows; r++) {
+      const y = (r / g.rows) * H;
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
     }
     ctx.stroke();
   }
@@ -126,7 +158,7 @@ function draw() {
   progressEl.textContent = placed + ' of ' + state.count + ' placed';
 }
 
-// ---------- WLED ----------
+// ---------- connecting ----------
 
 async function lightCurrent() {
   if (!state.ip) return;
@@ -142,18 +174,15 @@ async function lightCurrent() {
   }
 }
 
-async function connect() {
+async function connect(quiet) {
   state.ip = ipInput.value.trim();
-  if (!state.ip) {
-    setStatus('Enter the controller IP first', 'error');
-    return;
-  }
-  setStatus('Connecting...');
+  if (!state.ip) return;
+  if (!quiet) setStatus('Connecting...');
   try {
     const res = await fetch('/api/wled/info?ip=' + encodeURIComponent(state.ip));
     const out = await res.json();
     if (!out.ok) {
-      setStatus('Could not connect: ' + out.error, 'error');
+      setStatus(quiet ? 'Not connected' : 'Could not connect: ' + out.error, quiet ? '' : 'error');
       return;
     }
     localStorage.setItem('wledIp', state.ip);
@@ -161,14 +190,104 @@ async function connect() {
     state.count = out.count;
     countInput.value = out.count;
     resizeLeds();
-    setStatus('Connected to ' + (out.name || 'WLED') + ' (v' + out.version + '), ' + out.count + ' LEDs', 'ok');
+    setStatus(
+      'Connected to ' + (out.name || 'WLED') + ' (v' + out.version + '), ' + out.count + ' LEDs',
+      'ok'
+    );
     draw();
     save();
     lightCurrent();
   } catch (e) {
-    setStatus('Could not connect: ' + e.message, 'error');
+    setStatus(quiet ? 'Not connected' : 'Could not connect: ' + e.message, quiet ? '' : 'error');
   }
 }
+
+connectForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  connect(false);
+});
+
+countInput.addEventListener('change', () => {
+  state.count = intValue(countInput, 50, 1, 2048);
+  countInput.value = state.count;
+  resizeLeds();
+  draw();
+  save();
+});
+
+// ---------- picture ----------
+
+function setBackground(img) {
+  state.bg = img;
+  canvas.width = img ? img.naturalWidth : BLANK_W;
+  canvas.height = img ? img.naturalHeight : BLANK_H;
+  removePicBtn.hidden = !img;
+  draw();
+}
+
+// shrink the photo and keep it in this browser tab only (nothing is uploaded)
+function shrink(file, maxSize) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxSize / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * scale);
+      c.height = Math.round(img.naturalHeight * scale);
+      const g = c.getContext('2d');
+      g.fillStyle = '#fff';
+      g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('this image type is not supported'));
+    };
+    img.src = url;
+  });
+}
+
+function loadImage(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('could not load the picture'));
+    img.src = dataUrl;
+  });
+}
+
+picInput.addEventListener('change', async () => {
+  const file = picInput.files[0];
+  if (!file) return;
+  try {
+    const dataUrl = await shrink(file, 1600);
+    try {
+      sessionStorage.setItem('bgImage', dataUrl);
+    } catch (e) {
+      // too big to remember across reloads, but it still works for now
+    }
+    setBackground(await loadImage(dataUrl));
+  } catch (err) {
+    alert('Could not use that picture: ' + err.message);
+  }
+  picInput.value = '';
+});
+
+removePicBtn.addEventListener('click', () => {
+  sessionStorage.removeItem('bgImage');
+  setBackground(null);
+});
+
+// let keyboard users open the file picker from the label
+picBtn.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    picInput.click();
+  }
+});
 
 // ---------- selecting and placing ----------
 
@@ -197,18 +316,15 @@ function hit(pt) {
 }
 
 function toFraction(pt) {
-  let x = pt.x;
-  let y = pt.y;
-  if (mode === 'grid' && state.grid) {
-    // snap to the center of the cell
-    const c = state.grid.cell;
-    x = (clamp(Math.floor(x / c), 0, state.grid.w - 1) + 0.5) * c;
-    y = (clamp(Math.floor(y / c), 0, state.grid.h - 1) + 0.5) * c;
+  let x = clamp(pt.x / canvas.width, 0, 1);
+  let y = clamp(pt.y / canvas.height, 0, 1);
+  if (snapBox.checked) {
+    // snap to the center of the grid cell
+    const g = gridSize();
+    x = (clamp(Math.floor(x * g.cols), 0, g.cols - 1) + 0.5) / g.cols;
+    y = (clamp(Math.floor(y * g.rows), 0, g.rows - 1) + 0.5) / g.rows;
   }
-  return {
-    x: clamp(x / canvas.width, 0, 1),
-    y: clamp(y / canvas.height, 0, 1),
-  };
+  return { x: x, y: y };
 }
 
 canvas.addEventListener('pointerdown', (e) => {
@@ -246,11 +362,31 @@ canvas.addEventListener('pointerup', () => {
   save();
 });
 
+// ---------- grid ----------
+
+function syncExportSize() {
+  const g = gridSize();
+  exportW.value = g.cols;
+  exportH.value = g.rows;
+}
+
+snapBox.addEventListener('change', () => {
+  draw();
+  save();
+});
+
+[colsInput, rowsInput].forEach((input) => {
+  input.addEventListener('change', () => {
+    syncExportSize();
+    draw();
+    save();
+  });
+});
+
 // ---------- buttons ----------
 
 document.getElementById('prev').addEventListener('click', () => select(state.current - 1));
 document.getElementById('next').addEventListener('click', () => select(state.current + 1));
-connectBtn.addEventListener('click', connect);
 
 document.getElementById('restore').addEventListener('click', async () => {
   if (!state.ip) return;
@@ -271,14 +407,6 @@ document.getElementById('clear').addEventListener('click', () => {
   lightCurrent();
 });
 
-countInput.addEventListener('change', () => {
-  state.count = clamp(parseInt(countInput.value, 10) || 1, 1, 2048);
-  countInput.value = state.count;
-  resizeLeds();
-  draw();
-  save();
-});
-
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
   if (e.key === 'ArrowLeft') select(state.current - 1);
@@ -286,16 +414,6 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ---------- export ----------
-
-function setExportDefaults() {
-  if (state.grid) {
-    exportW.value = state.grid.w;
-    exportH.value = state.grid.h;
-  } else {
-    exportW.value = 16;
-    exportH.value = Math.max(1, Math.round((16 * canvas.height) / canvas.width));
-  }
-}
 
 function buildLedmap(w, h) {
   const map = new Array(w * h).fill(-1);
@@ -324,14 +442,9 @@ function listShort(items) {
   return items.length > 8 ? items.slice(0, 8).join(', ') + '...' : items.join(', ');
 }
 
-function setExportMsg(text, kind) {
-  exportMsg.textContent = text;
-  exportMsg.className = 'export-msg' + (kind ? ' ' + kind : '');
-}
-
 document.getElementById('export').addEventListener('click', () => {
-  const w = clamp(parseInt(exportW.value, 10) || 1, 1, 256);
-  const h = clamp(parseInt(exportH.value, 10) || 1, 1, 256);
+  const w = intValue(exportW, 16, 1, 256);
+  const h = intValue(exportH, 9, 1, 256);
   exportW.value = w;
   exportH.value = h;
 
@@ -380,13 +493,11 @@ let saveTimer = null;
 function save() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
+    const g = gridSize();
     post('/api/positions', {
-      key: state.key,
-      mode: mode,
       wled_ip: state.ip,
       led_count: state.count,
-      canvas: { width: canvas.width, height: canvas.height },
-      grid: state.grid,
+      snap: { enabled: snapBox.checked, cols: g.cols, rows: g.rows },
       leds: state.leds,
     });
   }, 300);
@@ -394,58 +505,49 @@ function save() {
 
 // ---------- startup ----------
 
-async function loadSaved() {
+async function init() {
+  ipInput.value = state.ip;
+  countInput.value = state.count;
+
   try {
     const res = await fetch('/api/positions');
     const saved = await res.json();
-    if (saved && saved.key === state.key) {
-      state.count = saved.led_count;
+    if (saved && Array.isArray(saved.leds)) {
+      state.count = saved.led_count || saved.leds.length;
       state.leds = saved.leds;
       countInput.value = state.count;
-      if (!state.ip && saved.wled_ip) state.ip = saved.wled_ip;
+      if (!state.ip && saved.wled_ip) {
+        state.ip = saved.wled_ip;
+        ipInput.value = state.ip;
+      }
+      if (saved.snap) {
+        snapBox.checked = !!saved.snap.enabled;
+        colsInput.value = saved.snap.cols || 16;
+        rowsInput.value = saved.snap.rows || 9;
+      }
     }
   } catch (e) {
     // start fresh
   }
-  ipInput.value = state.ip;
+
   resizeLeds();
   state.current = firstUnplaced();
-  setExportDefaults();
-  draw();
+  syncExportSize();
+
+  // bring back the picture from earlier in this tab, if any
+  const dataUrl = sessionStorage.getItem('bgImage');
+  if (dataUrl) {
+    try {
+      setBackground(await loadImage(dataUrl));
+    } catch (e) {
+      setBackground(null);
+    }
+  } else {
+    setBackground(null);
+  }
 
   // connect right away if we already know the controller
-  if (state.ip) connect();
-}
-
-function init() {
-  if (mode === 'grid') {
-    const w = clamp(parseInt(params.get('w'), 10) || 16, 1, 256);
-    const h = clamp(parseInt(params.get('h'), 10) || 8, 1, 256);
-    const cell = clamp(parseInt(params.get('cell'), 10) || 32, 4, 200);
-    state.grid = { w: w, h: h, cell: cell };
-    state.key = 'grid:' + w + 'x' + h + ':' + cell;
-    canvas.width = w * cell;
-    canvas.height = h * cell;
-    loadSaved();
-  } else {
-    // the photo lives in this browser tab only (put there by the landing page)
-    const dataUrl = sessionStorage.getItem('bgImage');
-    const bgKey = sessionStorage.getItem('bgKey');
-    if (!dataUrl) {
-      location.href = '/';
-      return;
-    }
-    state.key = 'image:' + bgKey;
-    const bg = new Image();
-    bg.onload = () => {
-      state.bg = bg;
-      canvas.width = bg.naturalWidth;
-      canvas.height = bg.naturalHeight;
-      loadSaved();
-    };
-    bg.onerror = () => setStatus('Could not load the image', 'error');
-    bg.src = dataUrl;
-  }
+  if (state.ip) connect(true);
 }
 
 init();

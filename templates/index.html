@@ -17,61 +17,86 @@
 
   <main class="page">
     <header class="hero">
-      <h1>Where do your lights live?</h1>
-      <p>Place each light on a photo of your room, or on a grid, and we'll turn it into a map.</p>
+      <h1>Map your lights!</h1>
+      <p>Connect, click where each light is, then export a ledmap.</p>
     </header>
 
+    <!-- connect -->
     <section class="card card-connect">
       <h2>Connect to your lights</h2>
       <p class="card-text">Enter your controller's IP so each LED can light up while you place it.</p>
-      <form id="connect-form" class="connect-row">
-        <label class="field">Controller IP
-          <input type="text" id="landing-ip" placeholder="192.168.1.45" autocomplete="off" required>
+      <form id="connect-form" class="row">
+        <label class="field grow">Controller IP
+          <input type="text" id="ip" placeholder="192.168.1.45" autocomplete="off" required>
         </label>
-        <button type="submit" class="btn">Connect</button>
+        <label class="field narrow">LEDs
+          <input type="number" id="count" min="1" max="2048" value="50">
+        </label>
+        <button type="submit" class="btn small">Connect</button>
       </form>
-      <p id="connect-status" class="connect-status" role="status">Not connected</p>
+      <p id="status" class="status" role="status">Not connected</p>
     </section>
 
-    <div class="choices">
-      <section class="card card-image">
-        <h2>Use a photo</h2>
-        <p class="card-text">Upload a picture of the space your lights hang in. It stays in your browser.</p>
+    <!-- place -->
+    <section class="card card-place">
+      <h2>Place your lights</h2>
 
-        <form id="image-form">
-          <input type="file" id="image-input" accept="image/*" hidden>
-          <label for="image-input" class="drop" tabindex="0">
-            <img id="image-preview" alt="Preview of your photo" hidden>
-            <span id="image-name" class="drop-text">Choose an image</span>
-          </label>
-          <button type="submit" id="start-image" class="btn" disabled>Start placing on image</button>
-        </form>
-      </section>
+      <div class="row tools">
+        <input type="file" id="pic" accept="image/*" hidden>
+        <label for="pic" class="btn small" id="pic-btn" tabindex="0">Upload picture</label>
+        <button type="button" id="remove-pic" class="btn small ghost" hidden>Remove picture</button>
 
-      <div class="or" aria-hidden="true">or</div>
+        <label class="check">
+          <input type="checkbox" id="snap">
+          <span>Snap to grid</span>
+        </label>
+        <label class="field narrow">Columns
+          <input type="number" id="cols" min="1" max="256" value="16">
+        </label>
+        <label class="field narrow">Rows
+          <input type="number" id="rows" min="1" max="256" value="9">
+        </label>
+      </div>
 
-      <section class="card card-grid">
-        <h2>Describe a grid</h2>
-        <p class="card-text">No photo? Tell us how big the grid is.</p>
+      <div class="now">
+        <h3 id="current">LED 0</h3>
+        <p id="progress" class="muted">0 of 50 placed</p>
+      </div>
 
-        <form id="grid-form" method="get" action="/place/grid">
-          <div class="fields">
-            <label class="field">Width
-              <input type="number" id="grid-w" name="w" min="1" max="256" value="16" required>
-            </label>
-            <label class="field">Height
-              <input type="number" id="grid-h" name="h" min="1" max="256" value="8" required>
-            </label>
-            <label class="field">Cell size (px)
-              <input type="number" id="grid-cell" name="cell" min="4" max="200" value="32" required>
-            </label>
-          </div>
-          <button type="submit" class="btn">Start placing on grid</button>
-        </form>
-      </section>
-    </div>
+      <div class="row controls">
+        <button type="button" id="prev" class="btn small">Previous</button>
+        <button type="button" id="next" class="btn small">Skip</button>
+        <button type="button" id="restore" class="btn small">Restore effects</button>
+        <button type="button" id="clear" class="btn small butter">Clear all</button>
+      </div>
+
+      <div class="stage">
+        <canvas id="canvas" width="960" height="540" aria-label="Click where the lit LED is"></canvas>
+      </div>
+
+      <p class="muted hint">
+        Click where the lit LED is. Click a dot to light that LED again, and drag a dot to move it.
+        Left and right arrow keys switch LEDs. The picture is optional, and everything saves automatically.
+      </p>
+    </section>
+
+    <!-- export -->
+    <section class="card card-export">
+      <h2>Export ledmap</h2>
+      <p class="card-text">Choose how many columns and rows the map should have. It starts at your grid size.</p>
+      <div class="row">
+        <label class="field narrow">Width
+          <input type="number" id="export-w" min="1" max="256" value="16">
+        </label>
+        <label class="field narrow">Height
+          <input type="number" id="export-h" min="1" max="256" value="9">
+        </label>
+        <button type="button" id="export" class="btn small mint">Export ledmap</button>
+      </div>
+      <p id="export-msg" class="status" role="status"></p>
+    </section>
   </main>
 
-  <script src="{{ url_for('static', filename='landing.js') }}"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

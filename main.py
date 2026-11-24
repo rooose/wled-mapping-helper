@@ -3,37 +3,22 @@ import re
 from pathlib import Path
 
 import requests
-from flask import Flask, jsonify, redirect, render_template, request, url_for
+from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
 
-# only positions.json lives here now; photos stay in the browser
+# only positions.json lives here; the picture stays in the browser
 DATA = Path(__file__).parent / "data"
 DATA.mkdir(exist_ok=True)
 
 HOST_RE = re.compile(r"[A-Za-z0-9._-]+(:\d+)?")
 
 
-# ---------- pages ----------
+# ---------- the page ----------
 
 @app.route("/")
 def index():
     return render_template("index.html")
-
-
-@app.route("/place/grid")
-def place_grid():
-    return redirect(url_for(
-        "place", mode="grid",
-        w=request.args.get("w", 16),
-        h=request.args.get("h", 8),
-        cell=request.args.get("cell", 32),
-    ))
-
-
-@app.route("/place")
-def place():
-    return render_template("place.html")
 
 
 # ---------- saved positions ----------
